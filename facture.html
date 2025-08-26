@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Facturation & Paiement du Personnel</title>
+
+<!-- Librairies PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+
+<style>
+:root{
+  --primary:#0d6efd;
+  --primary-dark:#0b5ed7;
+  --green:#22c55e;
+  --green-dark:#16a34a;
+  --red:#dc3545;
+  --border:#dbe2ea;
+  --bg:#f4f6f9;
+  --card:#ffffff;
+  --text:#1f2937;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
+  background: var(--bg);
+  color: var(--text);
+  margin:0;
+  line-height:1.5;
+}
+
+/* App header */
+.appbar{
+  background: linear-gradient(135deg, var(--primary) 0%, #46a7ff 100%);
+  color:#fff;
+  padding: 18px 14px;
+  text-align:center;
+}
+.appbar h1{ margin:0; font-size: clamp(20px, 2.6vw, 28px); font-weight:800; letter-spacing:.3px }
+.appbar p{ margin:6px 0 0; opacity:.95; font-size:14px }
+
+.container{
+  width:min(100%, 980px);
+  margin: 18px auto;
+  padding: clamp(12px, 2.5vw, 24px);
+}
+
+/* Cards */
+.card{
+  background: var(--card);
+  border:1px solid var(--border);
+  border-radius: 16px;
+  padding: clamp(12px, 2.2vw, 18px);
+  margin: 12px 0;
+  box-shadow: 0 12px 28px rgba(16,24,40,.04);
+}
+.card h2{
+  margin: 0 0 10px;
+  color: var(--primary);
+  font-size: clamp(18px, 2.4vw, 22px);
+}
+
+/* Forms */
+.row{ display:grid; grid-template-columns: repeat(12,1fr); gap: 12px }
+.col{ grid-column: span 12 }
+@media (min-width: 700px){
+  .col-6{ grid-column: span 6 }
+  .col-4{ grid-column: span 4 }
+}
+
+label{ display:block; font-weight:700; margin-bottom:6px }
+input[type="text"], input[type="number"], input[type="date"], textarea, select{
+  width:100%; padding:12px; border:1px solid var(--border); border-radius:12px;
+  background:#fff; outline:none; transition: border-color .2s, box-shadow .2s;
+}
+input:focus, textarea:focus, select:focus{ border-color: var(--primary); box-shadow: 0 0 0 3px rgba(13,110,253,.1) }
+textarea{ min-height:110px; resize:vertical }
+
+.actions{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:10px }
+button{
+  background: var(--primary);
+  color:#fff; border:none; border-radius:12px;
+  padding:12px 18px; font-size:16px; font-weight:700; cursor:pointer; transition:.18s;
+  width: 100%; max-width: 360px;
+}
+button:hover{ background: var(--primary-dark); transform: translateY(-1px) }
+.btn-success{ background: var(--green) }
+.btn-success:hover{ background: var(--green-dark) }
+.btn-outline{
+  background:#fff; color: var(--primary); border:1px solid var(--primary)
+}
+.helper{ color:#6b7280; font-size:13px; margin-top:6px }
+
+/* Logo uploader */
+.logo-upload{
+  text-align:center; border:2px dashed var(--primary); border-radius:16px; padding:16px; margin-bottom:16px; background:#fff;
+}
+.logo-preview{
+  max-width:220px; max-height:110px; display:none; border:1px solid #eef2f7; border-radius:10px; padding:6px; margin:10px auto;
+}
+.logo-controls{ display:flex; gap:12px; justify-content:center; align-items:center }
+.size-btn{ width:44px; height:44px; border-radius:50%; background:var(--primary); color:#fff; border:none; font-size:20px; font-weight:800; cursor:pointer }
+#sizeDisplay{ min-width:70px; border:1px solid #e5e7eb; border-radius:8px; padding:6px 10px; background:#f8fafc; font-family:monospace; font-weight:800 }
+
+/* Lines table (UI only) */
+.table-wrap{ overflow-x:auto; background:#fff; border:1px solid var(--border); border-radius:14px }
+.table-ui{ width:100%; border-collapse: collapse; min-width:760px }
+.table-ui th, .table-ui td{ border-bottom:1px solid #eef2f7; padding:12px; text-align:left }
+.table-ui th{ background:#f8fafc; font-size:14px; letter-spacing:.2px }
+.table-ui tr:last-child td{ border-bottom:none }
+.table-ui td input, .table-ui td select{ width:100%; border:none; background:transparent; outline:none; font-size:15px }
+.remove-line{ color:var(--red); cursor:pointer; font-size:22px; line-height:1 }
+
+/* PDF preview images */
+#pdfImages img{ width:100%; height:auto; margin: 14px 0 }
+@media (min-width: 768px){ #pdfImages img{ width:80% } }
+@media (min-width: 1024px){ #pdfImages img{ width:60% } }
+/* Aperçu PDF - Paiement du personnel */
+#payrollImages img{ width:100%; height:auto; margin:14px 0 }
+@media (min-width: 768px){ #payrollImages img{ width:80% } }
+@media (min-width: 1024px){ #payrollImages img{ width:60% } }
+
+/* Make it comfy on phones */
+@media (max-width: 480px){
+  .actions button{ max-width:none }
+  .logo-upload{ padding:12px }
+}
+.hidden{display:none}
+tfoot .label-cell{ text-align:right; font-weight:800 }
+tfoot .emph{ background:#eef2f7; font-weight:900 }
+tfoot input[type="number"]{
+  border: 1px solid var(--border); border-radius:8px; padding:8px 10px; width:100%;
+  background:#fff;
+}
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <h1>Génération des Factures & Paiement du Personnel</h1>
+  <p>Charge ton logo (filigrane auto), choisis la date, puis crée ton document.</p>
+</header>
+
+<main class="container">
+
+  <!-- Bloc Logo -->
+  <section class="logo-upload card">
+    <input type="file" id="logoInput" accept="image/*" onchange="previewLogo(event)">
+    <img id="logoPreview" class="logo-preview" alt="Aperçu du logo">
+    <div class="logo-controls">
+      <button class="size-btn" onclick="adjustLogoSize(-0.1)">−</button>
+      <span id="sizeDisplay">100%</span>
+      <button class="size-btn" onclick="adjustLogoSize(0.1)">+</button>
+    </div>
+    <div class="helper">Le logo apparaîtra <b>dans la marge haute</b> + en <b>filigrane</b> au centre du PDF.</div>
+  </section>
+
+  <!-- Étape 1 : Date -->
+  <section id="stepDate" class="card">
+    <h2>Étape 1 · Dates</h2>
+    <div class="row">
+      <div class="col col-4">
+        <label for="invoiceDate">Date du document</label>
+        <input type="date" id="invoiceDate" />
+      </div>
+      <div class="col col-4">
+        <label for="dueDate">Échéance (optionnel)</label>
+        <input type="date" id="dueDate" />
+      </div>
+      <div class="col col-4">
+        <label for="deliveryDate">Date de livraison (optionnel)</label>
+        <input type="date" id="deliveryDate" />
+      </div>
+    </div>
+    <div class="actions"><button id="btnContinue" class="btn-success">Continuer</button></div>
+  </section>
+
+  <!-- Étape 2 : Choix -->
+  <section id="stepChoice" class="card hidden" style="text-align:center">
+    <h2>Étape 2 · Choisissez</h2>
+    <div class="actions">
+      <button id="btnGoInvoice">Générer une facture client</button>
+      <button id="btnGoPayroll" class="btn-outline">Paiement du personnel</button>
+    </div>
+  </section>
+
+  <!-- Étape 3A : Formulaire Facture -->
+  <section id="invoiceForm" class="card hidden">
+    <h2>Étape 3 · Détails de la facture</h2>
+    <div class="row">
+      <div class="col col-4">
+        <label for="invoiceNumber">Numéro</label>
+        <input type="text" id="invoiceNumber" placeholder="Ex : 042042">
+      </div>
+      <div class="col col-4">
+        <label for="billedTo">Facturé à</label>
+        <textarea id="billedTo" placeholder="Nom / Société&#10;Adresse&#10;Ville, Code postal&#10;Pays"></textarea>
+      </div>
+      <div class="col col-4">
+        <label for="issuer">Émetteur (optionnel)</label>
+        <textarea id="issuer" placeholder="Votre entreprise&#10;Adresse&#10;E-mail / Téléphone"></textarea>
+      </div>
+    </div>
+
+    <h2 style="margin:8px 0 10px">Produits / Services</h2>
+    <div class="actions">
+      <button id="btnAddLine">+ Ajouter une ligne</button>
+    </div>
+
+    <div class="table-wrap" style="margin-top:10px">
+      <table class="table-ui" id="linesTable">
+        <thead>
+          <tr>
+            <th style="min-width:260px">Description</th>
+            <th style="min-width:110px">Quantité</th>
+            <th style="min-width:140px">Prix unitaire (MRU)</th>
+            <th style="min-width:160px">Montant (MRU)</th>
+            <th style="width:44px"></th>
+          </tr>
+        </thead>
+        <tbody id="linesBody"></tbody>
+        <tfoot>
+          <tr>
+            <td class="label-cell" colspan="3">Montant total (MRU) :</td>
+            <td id="totalCell">0,00</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="label-cell" colspan="3">Avance payée (MRU) <span style="font-weight:500;color:#6b7280">(optionnel)</span> :</td>
+            <td>
+              <input id="advanceInput" type="number" step="0.01" min="0" placeholder="0.00" />
+            </td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="label-cell" colspan="3">Reste à payer (MRU) :</td>
+            <td id="remainingCell">0,00</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td class="label-cell emph" colspan="3">TOTAL À PAYER (MRU) :</td>
+            <td id="grandTotalCell" class="emph">0,00</td>
+            <td class="emph"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="actions" style="margin-top:14px">
+      <button id="generatePdfButton">Générer le PDF</button>
+      <button id="previewPdfButton" class="hidden">Aperçu du PDF</button>
+      <button id="downloadPdfButton" class="hidden">Télécharger le PDF</button>
+    </div>
+
+    <div id="pdfPreview" class="hidden">
+      <div id="pdfImages" style="display:flex;flex-direction:column;align-items:center"></div>
+    </div>
+  </section>
+
+  <!-- Étape 3B : Formulaire Paiement Personnel -->
+  <section id="payrollForm" class="card hidden">
+    <h2>Étape 3 · Paiement du personnel</h2>
+    <div class="row">
+      <div class="col col-4">
+        <label for="payrollNumber">Numéro</label>
+        <input type="text" id="payrollNumber" placeholder="Ex : P-0001">
+      </div>
+      <div class="col col-4">
+        <label for="payrollClient">Facturé à</label>
+        <textarea id="payrollClient" placeholder="Nom / Société&#10;Adresse&#10;Ville, Code postal&#10;Pays"></textarea>
+      </div>
+      <div class="col col-4">
+        <label for="payrollIssuer">Émetteur (optionnel)</label>
+        <textarea id="payrollIssuer" placeholder="Votre entreprise&#10;Adresse&#10;E-mail / Téléphone"></textarea>
+      </div>
+    </div>
+
+    <h2 style="margin:8px 0 10px">Lignes du personnel</h2>
+    <div class="actions">
+      <button id="btnAddStaff">+ Ajouter un personnel</button>
+    </div>
+
+    <div class="table-wrap" style="margin-top:10px">
+      <table class="table-ui" id="staffTable">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>Rôle</th>
+            <th>Type</th>
+            <th>Prix (MRU)</th>
+            <th>Jours</th>
+            <th>Montant (MRU)</th>
+            <th style="width:44px"></th>
+          </tr>
+        </thead>
+        <tbody id="staffBody"></tbody>
+      </table>
+    </div>
+
+    <div class="actions" style="margin-top:14px">
+      <button id="generatePayrollPdf">Générer le PDF Paiement</button>
+      <button id="previewPayrollPdf" class="hidden">Aperçu du PDF</button>
+      <button id="downloadPayrollPdf" class="hidden">Télécharger le PDF</button>
+    </div>
+
+    <div id="payrollPreview" class="hidden">
+      <div id="payrollImages" style="display:flex;flex-direction:column;align-items:center"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ========== Utils ========== */
+function fmtMoney(n){
+  // IMPORTANT: pas de regroupement des milliers => évite tout retour à la ligne dans le PDF
+  return (Number(n)||0).toLocaleString('fr-FR',{
+    minimumFractionDigits:2, maximumFractionDigits:2, useGrouping:false
+  });
+}
+function parseUiMoney(txt){
+  // accepte "1234,56" ou "1234.56"
+  const s = String(txt||'').replace(/\s/g,'').replace(',', '.');
+  const v = parseFloat(s);
+  return isNaN(v) ? 0 : v;
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+/* ========== Logo (aperçu + taille + mémoire) ========== */
+let logoScale = 1.0;
+let savedLogoDataUrl = null;
+
+function adjustLogoSize(delta){
+  logoScale = Math.max(0.5, Math.min(2.0, logoScale + delta));
+  document.getElementById('sizeDisplay').textContent = Math.round(logoScale*100) + '%';
+  persist();
+}
+function previewLogo(evt){
+  const input = evt.target;
+  const img = document.getElementById('logoPreview');
+  if(!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    savedLogoDataUrl = e.target.result;
+    img.src = savedLogoDataUrl;
+    img.style.display = 'block';
+    persist();
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+/* ========== Navigation ========== */
+const stepDate = document.getElementById('stepDate');
+const stepChoice = document.getElementById('stepChoice');
+const invoiceForm = document.getElementById('invoiceForm');
+const payrollForm = document.getElementById('payrollForm');
+
+document.getElementById('btnContinue').addEventListener('click', ()=>{
+  const date = document.getElementById('invoiceDate').value;
+  if(!date){ alert("Veuillez choisir la date."); return; }
+  stepChoice.classList.remove('hidden');
+  stepDate.classList.add('hidden');
+});
+document.getElementById('btnGoInvoice').addEventListener('click', ()=>{
+  invoiceForm.classList.remove('hidden');
+  payrollForm.classList.add('hidden');
+  stepChoice.classList.add('hidden');
+});
+document.getElementById('btnGoPayroll').addEventListener('click', ()=>{
+  payrollForm.classList.remove('hidden');
+  invoiceForm.classList.add('hidden');
+  stepChoice.classList.add('hidden');
+});
+
+/* ========== Lignes Facture ========== */
+const bodyEl = document.getElementById('linesBody');
+document.getElementById('btnAddLine').addEventListener('click', addLine);
+
+function addLine(pref = {desc:'', qty:'', price:''}){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="desc" placeholder="Description" value="${escapeHtml(pref.desc)}"></td>
+    <td><input type="number" class="qty" min="0" step="0.01" placeholder="0" value="${pref.qty}"></td>
+    <td><input type="number" class="price" min="0" step="0.01" placeholder="0.00" value="${pref.price}"></td>
+    <td class="amount">0,00</td>
+    <td style="text-align:center"><span class="remove-line" title="Supprimer">×</span></td>
+  `;
+  bodyEl.appendChild(tr);
+
+  const qty = tr.querySelector('.qty');
+  const price = tr.querySelector('.price');
+  const desc = tr.querySelector('.desc');
+  const rm = tr.querySelector('.remove-line');
+
+  const recalc = ()=>{ 
+    const q = parseFloat(qty.value)||0; const p = parseFloat(price.value)||0;
+    tr.querySelector('.amount').textContent = fmtMoney(q*p);
+    computeTotals(); persist();
+  };
+  qty.addEventListener('input', recalc);
+  price.addEventListener('input', recalc);
+  desc.addEventListener('input', ()=>persist());
+  rm.addEventListener('click', ()=>{ tr.remove(); computeTotals(); persist(); });
+  recalc();
+}
+
+function computeTotals(){
+  let total = 0;
+  document.querySelectorAll('#linesBody .amount').forEach(td=>{
+    total += parseUiMoney(td.textContent);
+  });
+
+  // Avance payée (optionnelle)
+  const advInput = document.getElementById('advanceInput');
+  let advance = parseUiMoney(advInput.value);
+  if(advance < 0) advance = 0;
+  if(advance > total) advance = total; // clamp pour éviter négatif
+  // bornes visuelles
+  advInput.max = String(total.toFixed(2));
+
+  const remaining = total - advance;
+  const dueNow = advance > 0 ? advance : total;
+
+  document.getElementById('totalCell').textContent = fmtMoney(total);
+  document.getElementById('remainingCell').textContent = fmtMoney(remaining);
+  document.getElementById('grandTotalCell').textContent = fmtMoney(dueNow);
+}
+
+/* ========== Lignes Personnel ========== */
+const staffBody = document.getElementById('staffBody');
+document.getElementById('btnAddStaff').addEventListener('click', addStaffRow);
+
+function addStaffRow(pref={name:'', role:'', type:'fixed', price:'', days:''}){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="name" placeholder="Nom" value="${escapeHtml(pref.name)}"></td>
+    <td><input type="text" class="role" placeholder="Rôle" value="${escapeHtml(pref.role)}"></td>
+    <td>
+      <select class="stype">
+        <option value="fixed"${pref.type==='fixed'?' selected':''}>Montant fixe</option>
+        <option value="daily"${pref.type==='daily'?' selected':''}>Journalier</option>
+      </select>
+    </td>
+    <td><input type="number" class="sprice" min="0" step="0.01" placeholder="0.00" value="${pref.price}"></td>
+    <td><input type="number" class="sdays" min="0" step="1" placeholder="0" value="${pref.days||''}"></td>
+    <td class="samount">0,00</td>
+    <td style="text-align:center"><span class="remove-line">×</span></td>
+  `;
+  staffBody.appendChild(tr);
+
+  const stype = tr.querySelector('.stype');
+  const price = tr.querySelector('.sprice');
+  const days  = tr.querySelector('.sdays');
+  const name  = tr.querySelector('.name');
+  const role  = tr.querySelector('.role');
+  const rm    = tr.querySelector('.remove-line');
+
+  const toggle = ()=>{
+    if(stype.value==='fixed'){
+      days.value = '';
+      days.disabled = true;
+    }else{
+      days.disabled = false;
+    }
+    recalc();
+  };
+  const recalc = ()=>{
+    const p = parseFloat(price.value)||0;
+    const d = (stype.value==='daily') ? (parseFloat(days.value)||0) : 1;
+    tr.querySelector('.samount').textContent = fmtMoney(p*d);
+    persist();
+  };
+
+  stype.addEventListener('change', toggle);
+  price.addEventListener('input', recalc);
+  days.addEventListener('input', recalc);
+  name.addEventListener('input', persist);
+  role.addEventListener('input', persist);
+  rm.addEventListener('click', ()=>{ tr.remove(); persist(); });
+
+  toggle();
+}
+
+/* ========== Persistance locale ========== */
+function persist(){
+  const lines = Array.from(document.querySelectorAll('#linesBody tr')).map(tr=>({
+    desc: tr.querySelector('.desc')?.value||'',
+    qty: tr.querySelector('.qty')?.value||'',
+    price: tr.querySelector('.price')?.value||'',
+  }));
+  const staff = Array.from(document.querySelectorAll('#staffBody tr')).map(tr=>({
+    name: tr.querySelector('.name')?.value||'',
+    role: tr.querySelector('.role')?.value||'',
+    type: tr.querySelector('.stype')?.value||'fixed',
+    price: tr.querySelector('.sprice')?.value||'',
+    days: tr.querySelector('.sdays')?.value||'',
+  }));
+  const data = {
+    logo: savedLogoDataUrl,
+    logoScale,
+    invoiceDate: document.getElementById('invoiceDate').value||'',
+    dueDate: document.getElementById('dueDate').value||'',
+    deliveryDate: document.getElementById('deliveryDate').value||'',
+    invoiceNumber: document.getElementById('invoiceNumber').value||'',
+    billedTo: document.getElementById('billedTo').value||'',
+    issuer: document.getElementById('issuer').value||'',
+    advance: document.getElementById('advanceInput').value||'',
+    lines,
+    payrollNumber: document.getElementById('payrollNumber').value||'',
+    payrollClient: document.getElementById('payrollClient').value||'',
+    payrollIssuer: document.getElementById('payrollIssuer').value||'',
+    staff
+  };
+  localStorage.setItem('invoiceApp', JSON.stringify(data));
+}
+function loadPersist(){
+  const raw = localStorage.getItem('invoiceApp'); if(!raw) return;
+  const data = JSON.parse(raw);
+
+  if(data.logo){
+    savedLogoDataUrl = data.logo;
+    const img = document.getElementById('logoPreview');
+    img.src = savedLogoDataUrl; img.style.display='block';
+  }
+  if(data.logoScale){ logoScale = data.logoScale; document.getElementById('sizeDisplay').textContent = Math.round(logoScale*100)+'%'; }
+  document.getElementById('invoiceDate').value = data.invoiceDate||'';
+  document.getElementById('dueDate').value = data.dueDate||'';
+  document.getElementById('deliveryDate').value = data.deliveryDate||'';
+  document.getElementById('invoiceNumber').value = data.invoiceNumber||'';
+  document.getElementById('billedTo').value = data.billedTo||'';
+  document.getElementById('issuer').value = data.issuer||'';
+  document.getElementById('advanceInput').value = data.advance||'';
+
+  (data.lines||[]).forEach(l=>addLine(l));
+  computeTotals();
+
+  document.getElementById('payrollNumber').value = data.payrollNumber||'';
+  document.getElementById('payrollClient').value = data.payrollClient||'';
+  document.getElementById('payrollIssuer').value = data.payrollIssuer||'';
+  (data.staff||[]).forEach(s=>addStaffRow(s));
+}
+['invoiceDate','dueDate','deliveryDate','invoiceNumber','billedTo','issuer',
+ 'payrollNumber','payrollClient','payrollIssuer']
+  .forEach(id=>document.getElementById(id).addEventListener('input', persist));
+// Avance: recalc + persist
+document.getElementById('advanceInput').addEventListener('input', ()=>{ computeTotals(); persist(); });
+
+window.addEventListener('load', loadPersist);
+
+/* ========== PDF Helpers communs (marges 3 cm + logo en marge) ========== */
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+
+function formatDate(dateString){
+  if(!dateString) return '-';
+  const d = new Date(dateString);
+  return d.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+async function drawHeader(doc, options){
+  const {title, billedTo, number, date, due, delivery, issuerFirstLine} = options;
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const M = 30;                       // 3 cm
+  const innerW = pageW - 2*M;
+  const leftX = M, rightX = M + innerW;
+
+  // traits haut/bas de zone contenu
+  doc.setDrawColor(215,220,226); doc.setLineWidth(0.3);
+  doc.line(leftX, M, rightX, M);
+  doc.line(leftX, pageH - M, rightX, pageH - M);
+
+  // LOGO dans la marge haute
+  let yLogoBottom = M;
+  if (savedLogoDataUrl){
+    try{
+      const img = new Image();
+      await new Promise((res,rej)=>{ img.onload = res; img.onerror = rej; img.src = savedLogoDataUrl; });
+      const w = 36 * (logoScale || 1);
+      const h = w * (img.height / img.width);
+      const yTop = Math.max(4, M - h - 6);
+      doc.addImage(img, 'PNG', leftX, yTop, w, h);
+      yLogoBottom = yTop + h;
+
+      // Filigrane très léger
+      try{
+        const wm = 100 * (logoScale || 1);
+        const wmX = (pageW - wm)/2, wmY = (pageH - wm)/2;
+        if (doc.GState) doc.setGState(new doc.GState({opacity:0.07}));
+        doc.addImage(img, 'PNG', wmX, wmY, wm, wm);
+        if (doc.GState) doc.setGState(new doc.GState({opacity:1}));
+      }catch(e){}
+    }catch(e){}
+  }
+
+  // Titre
+  const yTitle = Math.max(M + 12, yLogoBottom + 8);
+  doc.setFont('helvetica','bold'); doc.setFontSize(18);
+  doc.text(title, leftX, yTitle);
+  doc.setDrawColor(230,234,239); doc.setLineWidth(0.2);
+  doc.line(leftX, yTitle + 3.5, rightX, yTitle + 3.5);
+
+  // issuer première ligne (discret)
+  if (issuerFirstLine){
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(120);
+    doc.text(issuerFirstLine, leftX, yTitle + 9);
+    doc.setTextColor(0);
+  }
+
+  // Ligne d'en-tête à deux colonnes
+  const yHeaderRow = yTitle + 14;
+
+  // Gauche - Facturé à
+  doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text('FACTURÉ À', leftX, yHeaderRow);
+  const leftColW = innerW * 0.52;
+  const billedLines = doc.splitTextToSize(billedTo || '-', leftColW - 6);
+  doc.text(billedLines, leftX, yHeaderRow + 6);
+  const leftBottom = yHeaderRow + 6 + billedLines.length * 5;
+
+  // Droite - infos
+  const rightColX = M + innerW * 0.60;
+  let yInfo = yHeaderRow;
+  const rows = [
+    ['Numéro :', number || '-'],
+    ['Date :', date || '-'],
+    ['Échéance :', due || '-'],
+    ['Date de livraison :', delivery || '-']
+  ];
+  doc.setFontSize(10);
+  rows.forEach(([k,v])=>{
+    doc.setFont('helvetica','bold');  doc.text(k, rightColX, yInfo);
+    doc.setFont('helvetica','normal');doc.text(v, rightColX + 28, yInfo);
+    yInfo += 6;
+  });
+
+  const topOfTable = Math.max(leftBottom, yInfo) + 8;
+  return {M, innerW, leftX, rightX, topOfTable, pageW, pageH};
+}
+
+/* ========== Génération PDF Facture (avec Avance/Reste) ========== */
+let generatedPdfBlob = null;
+
+document.getElementById('generatePdfButton').addEventListener('click', async ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4', compress:true });
+
+  const header = await drawHeader(doc, {
+    title: 'FACTURE',
+    billedTo: (document.getElementById('billedTo').value||'').trim(),
+    number: (document.getElementById('invoiceNumber').value||'').trim(),
+    date: formatDate(document.getElementById('invoiceDate').value),
+    due: formatDate(document.getElementById('dueDate').value),
+    delivery: formatDate(document.getElementById('deliveryDate').value),
+    issuerFirstLine: (document.getElementById('issuer').value||'').trim().split('\n')[0]||''
+  });
+
+  // Lignes facture
+  const lines = Array.from(document.querySelectorAll('#linesBody tr')).map(tr=>{
+    const d = tr.querySelector('.desc')?.value || '';
+    const q = parseFloat(tr.querySelector('.qty')?.value) || 0;
+    const p = parseFloat(tr.querySelector('.price')?.value) || 0;
+    const m = (q*p);
+    return [d, q.toString(), fmtMoney(p), fmtMoney(m)];
+  });
+  const total = lines.reduce((s,l)=> s + parseUiMoney(l[3]), 0);
+
+  // Avance / Reste / À payer
+  let advance = parseUiMoney(document.getElementById('advanceInput').value);
+  if(advance < 0) advance = 0;
+  if(advance > total) advance = total;
+  const remaining = total - advance;
+  const dueNow = advance > 0 ? advance : total;
+
+  doc.autoTable({
+    head: [['DESCRIPTION','QUANTITÉ','PRIX (MRU)','MONTANT (MRU)']],
+    body: lines,
+    theme: 'grid',
+    startY: header.topOfTable,
+    margin:{ left: header.M, right: header.M },
+    tableWidth: header.innerW,
+    styles:{
+      font:'helvetica', fontSize:9.5, cellPadding:3.2,
+      lineColor:[212,217,223], lineWidth:0.2, halign:'center', valign:'middle'
+    },
+    headStyles:{ fillColor:[248,249,251], textColor:[28,35,45], fontStyle:'bold', fontSize:10 },
+    alternateRowStyles:{ fillColor:[252,252,252] },
+    columnStyles:{
+      0:{ cellWidth: header.innerW * 0.50, halign:'left'  },
+      1:{ cellWidth: header.innerW * 0.12, halign:'center'},
+      2:{ cellWidth: header.innerW * 0.19, halign:'right' },
+      3:{ cellWidth: header.innerW * 0.19, halign:'right' }
+    },
+    pageBreak:'auto'
+  });
+
+  // Bloc totaux (multi-lignes)
+  const yAfterTable = (doc.lastAutoTable ? doc.lastAutoTable.finalY : header.topOfTable) + 6;
+  const blockW = Math.min(118, header.innerW);
+  const blockX = header.rightX - blockW;
+
+  // Tableau "Montant total / Avance / Reste"
+  const summaryRows = [
+    [{content:'MONTANT TOTAL (MRU):', styles:{halign:'left', fontStyle:'bold'}},
+     {content: fmtMoney(total),        styles:{halign:'right'}}]
+  ];
+  if(advance > 0){
+    summaryRows.push(
+      [{content:'AVANCE PAYÉE (MRU):', styles:{halign:'left'}},
+       {content: fmtMoney(advance),     styles:{halign:'right'}}],
+      [{content:'RESTE À PAYER (MRU):', styles:{halign:'left'}},
+       {content: fmtMoney(remaining),   styles:{halign:'right'}}]
+    );
+  }
+
+  doc.autoTable({
+    body: summaryRows,
+    theme:'grid',
+    styles:{ font:'helvetica', fontSize:10, cellPadding:3, lineColor:[212,217,223], lineWidth:0.2 },
+    columnStyles:{ 0:{cellWidth: blockW-44}, 1:{cellWidth: 44} },
+    tableWidth: blockW,
+    margin:{ left: blockX },
+    startY: yAfterTable
+  });
+
+  // Ligne finale "TOTAL À PAYER" = Avance si saisie, sinon Total
+  doc.autoTable({
+    body: [
+      [
+        {content:'TOTAL À PAYER (MRU):', styles:{halign:'left',  fontStyle:'bold', textColor:[255,255,255], fillColor:[115,115,115]}},
+        {content: fmtMoney(dueNow),      styles:{halign:'right', textColor:[255,255,255], fillColor:[115,115,115]}}
+      ]
+    ],
+    theme:'plain',
+    styles:{ font:'helvetica', fontSize:11, cellPadding:3.2 },
+    columnStyles:{ 0:{cellWidth: blockW-44}, 1:{cellWidth: 44} },
+    tableWidth: blockW,
+    margin:{ left: blockX },
+    startY: (doc.lastAutoTable ? doc.lastAutoTable.finalY : yAfterTable) + 2
+  });
+
+  generatedPdfBlob = doc.output('blob');
+  document.getElementById('previewPdfButton').classList.remove('hidden');
+  document.getElementById('downloadPdfButton').classList.remove('hidden');
+  alert('PDF généré. Aperçu et téléchargement disponibles.');
+});
+
+/* Aperçu & téléchargement Facture */
+document.getElementById('previewPdfButton').addEventListener('click', ()=>{
+  if(!generatedPdfBlob){ alert("Générez d'abord le PDF."); return; }
+  const pdfUrl = URL.createObjectURL(generatedPdfBlob);
+  const loadingTask = pdfjsLib.getDocument(pdfUrl);
+  const cont = document.getElementById('pdfImages');
+  cont.innerHTML = '';
+  loadingTask.promise.then(pdf=>{
+    const renderPage = num=>{
+      pdf.getPage(num).then(page=>{
+        const viewport = page.getViewport({scale:1.4});
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = viewport.width; canvas.height = viewport.height;
+        page.render({canvasContext:ctx, viewport}).promise.then(()=>{
+          const img = document.createElement('img');
+          img.src = canvas.toDataURL();
+          cont.appendChild(img);
+          if(num < pdf.numPages) renderPage(num+1);
+        });
+      });
+    };
+    renderPage(1);
+    document.getElementById('pdfPreview').classList.remove('hidden');
+  });
+});
+document.getElementById('downloadPdfButton').addEventListener('click', ()=>{
+  if(!generatedPdfBlob){ alert("Générez d'abord le PDF."); return; }
+  const url = URL.createObjectURL(generatedPdfBlob);
+  const a = document.createElement('a');
+  const today = new Date();
+  const stamp = today.toLocaleDateString('fr-FR',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'-');
+  a.href = url;
+  a.download = `Facture_${(document.getElementById('invoiceNumber').value||'').trim() || stamp}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* ========== Génération PDF Paiement du personnel (inchangé) ========== */
+let generatedPayrollBlob = null;
+
+document.getElementById('generatePayrollPdf').addEventListener('click', async ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'mm', format:'a4', compress:true });
+
+  const header = await drawHeader(doc, {
+    title: 'FACTURE PAIEMENT PERSONNEL',
+    billedTo: (document.getElementById('payrollClient').value||'').trim(),
+    number: (document.getElementById('payrollNumber').value||'').trim(),
+    date: formatDate(document.getElementById('invoiceDate').value),
+    due: formatDate(document.getElementById('dueDate').value),
+    delivery: formatDate(document.getElementById('deliveryDate').value),
+    issuerFirstLine: (document.getElementById('payrollIssuer').value||'').trim().split('\n')[0]||''
+  });
+
+  // Lignes staff
+  const rows = Array.from(document.querySelectorAll('#staffBody tr')).map(tr=>{
+    const name = tr.querySelector('.name')?.value || '';
+    const role = tr.querySelector('.role')?.value || '';
+    const type = tr.querySelector('.stype')?.value === 'daily' ? 'Journalier' : 'Montant fixe';
+    const price = parseFloat(tr.querySelector('.sprice')?.value) || 0;
+    const days  = tr.querySelector('.stype')?.value === 'daily' ? (parseFloat(tr.querySelector('.sdays')?.value)||0) : '';
+    const amount = tr.querySelector('.stype')?.value === 'daily' ? price * (parseFloat(tr.querySelector('.sdays')?.value)||0) : price;
+    return [name, role, type, fmtMoney(price), (days===''?'—':String(days)), fmtMoney(amount)];
+  });
+
+  const total = rows.reduce((s,r)=> s + parseUiMoney(r[5]), 0);
+
+  doc.autoTable({
+    head: [['NOM','RÔLE','TYPE','PRIX (MRU)','JOURS','MONTANT (MRU)']],
+    body: rows,
+    theme:'grid',
+    startY: header.topOfTable,
+    margin:{ left: header.M, right: header.M },
+    tableWidth: header.innerW,
+    styles:{ font:'helvetica', fontSize:9.5, cellPadding:3.2, lineColor:[212,217,223], lineWidth:0.2, halign:'center', valign:'middle' },
+    headStyles:{ fillColor:[248,249,251], textColor:[28,35,45], fontStyle:'bold', fontSize:10 },
+    alternateRowStyles:{ fillColor:[252,252,252] },
+    columnStyles:{
+      0:{ cellWidth: header.innerW*0.20, halign:'left'  }, // NOM
+      1:{ cellWidth: header.innerW*0.20, halign:'left'  }, // RÔLE
+      2:{ cellWidth: header.innerW*0.13               }, // TYPE
+      3:{ cellWidth: header.innerW*0.19, halign:'right' }, // PRIX
+      4:{ cellWidth: header.innerW*0.08, halign:'center'}, // JOURS
+      5:{ cellWidth: header.innerW*0.20, halign:'right' }  // MONTANT
+    },
+    pageBreak:'auto'
+  });
+
+  // Totaux
+  const yAfter = (doc.lastAutoTable ? doc.lastAutoTable.finalY : header.topOfTable) + 6;
+  const blockW = Math.min(102, header.innerW);
+  const blockX = header.rightX - blockW;
+
+  doc.autoTable({
+    body: [
+      [{content:'MONTANT TOTAL (MRU):', styles:{halign:'left', fontStyle:'bold'}},
+       {content: fmtMoney(total), styles:{halign:'right'}}]
+    ],
+    theme:'grid',
+    styles:{ font:'helvetica', fontSize:10, cellPadding:3, lineColor:[212,217,223], lineWidth:0.2 },
+    columnStyles:{ 0:{cellWidth:blockW-40}, 1:{cellWidth:40} },
+    tableWidth:blockW,
+    margin:{ left:blockX },
+    startY:yAfter
+  });
+
+  doc.autoTable({
+    body: [
+      [{content:'TOTAL À PAYER (MRU):', styles:{halign:'left', fontStyle:'bold', textColor:[255,255,255], fillColor:[115,115,115]}},
+       {content: fmtMoney(total), styles:{halign:'right', textColor:[255,255,255], fillColor:[115,115,115]}}]
+    ],
+    theme:'plain',
+    styles:{ font:'helvetica', fontSize:10, cellPadding:3 },
+    columnStyles:{ 0:{cellWidth:blockW-40}, 1:{cellWidth:40} },
+    tableWidth:blockW,
+    margin:{ left:blockX },
+    startY:(doc.lastAutoTable?doc.lastAutoTable.finalY:yAfter)+2
+  });
+
+  generatedPayrollBlob = doc.output('blob');
+  document.getElementById('previewPayrollPdf').classList.remove('hidden');
+  document.getElementById('downloadPayrollPdf').classList.remove('hidden');
+  alert('PDF Paiement généré. Aperçu et téléchargement disponibles.');
+});
+
+/* Aperçu & téléchargement Paiement */
+document.getElementById('previewPayrollPdf').addEventListener('click', ()=>{
+  if(!generatedPayrollBlob){ alert("Générez d'abord le PDF."); return; }
+  const pdfUrl = URL.createObjectURL(generatedPayrollBlob);
+  const loadingTask = pdfjsLib.getDocument(pdfUrl);
+  const cont = document.getElementById('payrollImages');
+  cont.innerHTML = '';
+  loadingTask.promise.then(pdf=>{
+    const renderPage = num=>{
+      pdf.getPage(num).then(page=>{
+        const viewport = page.getViewport({scale:1.4});
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = viewport.width; canvas.height = viewport.height;
+        page.render({canvasContext:ctx, viewport}).promise.then(()=>{
+          const img = document.createElement('img');
+          img.src = canvas.toDataURL();
+          cont.appendChild(img);
+          if(num < pdf.numPages) renderPage(num+1);
+        });
+      });
+    };
+    renderPage(1);
+    document.getElementById('payrollPreview').classList.remove('hidden');
+  });
+});
+document.getElementById('downloadPayrollPdf').addEventListener('click', ()=>{
+  if(!generatedPayrollBlob){ alert("Générez d'abord le PDF."); return; }
+  const url = URL.createObjectURL(generatedPayrollBlob);
+  const a = document.createElement('a');
+  const today = new Date();
+  const stamp = today.toLocaleDateString('fr-FR',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'-');
+  a.href = url;
+  a.download = `PaiementPersonnel_${(document.getElementById('payrollNumber').value||'').trim() || stamp}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
